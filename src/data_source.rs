@@ -1,18 +1,19 @@
-use crate::Result;
+use crate::{Error, Result};
 use async_graphql::{Request, Response};
 use async_trait::async_trait;
+use http::{header::HeaderMap, method::Method};
 
 /// DataSource http options
 pub struct HttpOptions {
-    pub method: String,
+    pub method: Method,
     pub url: String,
-    pub headers: http::header::HeaderMap,
+    pub headers: HeaderMap,
 }
 
 impl HttpOptions {
     pub fn new(url: String) -> Self {
         Self {
-            method: "POST".to_string(),
+            method: Method::POST,
             url,
             headers: Default::default(),
         }
@@ -37,9 +38,9 @@ pub trait DataSource: Send + Sync {
 }
 
 #[async_trait]
-impl DataSource for Box<dyn DataSource> {
+impl<T: DataSource + ?Sized> DataSource for Box<T> {
     async fn process(&self, request: DataSourceRequest) -> Result<Response> {
-        DataSource::process(&*self, request).await
+        T::process(&self, request).await
     }
 }
 
@@ -50,7 +51,17 @@ pub struct DefaultDataSource;
 #[async_trait]
 impl DataSource for DefaultDataSource {
     async fn process(&self, request: DataSourceRequest) -> Result<Response> {
-        // reqwest::get(url)
-        todo!()
+        let client = reqwest::Client::new();
+        let http = request
+            .http
+            .ok_or(Error::invalid_input("request don't have http field"))?;
+        let resp = client
+            .request(http.method, &http.url)
+            .headers(http.headers)
+            .body(serde_json::to_string(&request.request)?)
+            .send()
+            .await?;
+
+        Ok(resp.json().await?)
     }
 }

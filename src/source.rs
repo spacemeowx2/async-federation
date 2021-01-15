@@ -45,8 +45,7 @@ impl ServiceSource for Remote {
             .await?
             .data()?;
 
-        println!("get sdl {}", resp._service.sdl);
-        todo!()
+        Ok(parse_schema(resp._service.sdl)?)
     }
 }
 

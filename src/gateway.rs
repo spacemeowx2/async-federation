@@ -18,8 +18,11 @@ impl Gateway {
         }
     }
     pub async fn serve(&mut self) -> Result<()> {
+        let mut docs = vec![];
         for i in self.service_list.iter() {
-            i.resolve(&self.data_source);
+            let document = i.resolve(&self.data_source).await?;
+            println!("{:x?} document", document);
+            docs.push(document);
         }
         Ok(())
     }
